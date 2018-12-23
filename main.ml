@@ -178,6 +178,26 @@ module Stack = struct
         Some (op, Buffer.to_float b)
     | _ ->
         None
+
+
+  let eq stack =
+    let stack = add_missing_operand stack in
+    let last_operation = last_operation stack in
+    let stack = simplify stack Op.max_precedence in
+    let result = eval stack in
+    let buf = Buffer.new_result result in
+    ([`Buffer buf], last_operation)
+
+
+  let repeat stack (operator, b) =
+    match stack with
+    | `Buffer buf :: rest ->
+        let a = Buffer.to_float buf in
+        let result = Op.apply operator a b in
+        let buf = Buffer.new_result result in
+        `Buffer buf :: rest
+    | _ ->
+        stack
 end
 
 type calculator =
@@ -283,26 +303,13 @@ let cancel cal =
 let eq cal =
   match cal.last_operation with
   | None ->
-      let stack = cal.stack in
-      let stack = Stack.add_missing_operand stack in
-      let last_operation = Stack.last_operation stack in
-      let stack = Stack.simplify stack Op.max_precedence in
-      let result = Stack.eval stack in
-      let buf = Buffer.new_result result in
-      let stack = [`Buffer buf] in
+      let stack, last_operation = Stack.eq cal.stack in
       let display = Stack.top_display stack in
       {cal with display; stack; last_operation}
-  | Some (operator, b) ->
-    ( match cal.stack with
-    | `Buffer buf :: _ ->
-        let a = Buffer.to_float buf in
-        let result = Op.apply operator a b in
-        let buf = Buffer.new_result result in
-        let stack = [`Buffer buf] in
-        let display = Stack.top_display stack in
-        {cal with display; stack}
-    | _ ->
-        cal )
+  | Some last_operation ->
+      let stack = Stack.repeat cal.stack last_operation in
+      let display = Stack.top_display stack in
+      {cal with display; stack}
 
 
 let input cal = function
