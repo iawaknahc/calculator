@@ -1,14 +1,40 @@
-type button =
-  [ `Cancel
-  | `Negate
-  | `Percent
-  | `Div
-  | `Mul
-  | `Sub
-  | `Add
-  | `Eq
-  | `Dot
-  | `Num of int ]
+module Button = struct
+  (* TODO: Implement percent *)
+  type t =
+    [ `Cancel
+    | `Negate
+    | `Div
+    | `Mul
+    | `Sub
+    | `Add
+    | `Eq
+    | `Dot
+    | `Num of int ]
+
+  let of_char = function
+    | 'c' | 'C' ->
+        `Cancel
+    | '~' ->
+        `Negate
+    | '/' ->
+        `Div
+    | '*' ->
+        `Mul
+    | '-' ->
+        `Sub
+    | '+' ->
+        `Add
+    | '=' ->
+        `Eq
+    | '.' ->
+        `Dot
+    | '0' .. '9' as ch ->
+        `Num (Char.code ch - Char.code '0')
+    | _ ->
+        failwith "invalid char"
+end
+
+let explode s = List.init (String.length s) (String.get s)
 
 let format_float f =
   match classify_float f with
@@ -181,12 +207,39 @@ module Stack = struct
 
 
   let eq stack =
-    let stack = add_missing_operand stack in
-    let last_operation = last_operation stack in
-    let stack = simplify stack Op.max_precedence in
-    let result = eval stack in
-    let buf = Buffer.new_result result in
-    ([`Buffer buf], last_operation)
+    (*
+     * The behavior of eq depends on the top of stack is operator or not.
+     * If it is an operand, just eval.
+     * If it is an operator, try preview-eval.
+     *   If success, the stack becomes [result; operator; result] and eval this stack.
+     *   Otherwise, add missing operand and eval the stack.
+     * *)
+    match stack with
+    | `Buffer _ :: _ ->
+        let last_operation = last_operation stack in
+        let stack = simplify stack Op.max_precedence in
+        let result = eval stack in
+        let buf = Buffer.new_result result in
+        ([`Buffer buf], last_operation)
+    | `Op op :: _ ->
+      ( match preview stack with
+      | None ->
+          let stack = add_missing_operand stack in
+          let last_operation = last_operation stack in
+          let stack = simplify stack Op.max_precedence in
+          let result = eval stack in
+          let buf = Buffer.new_result result in
+          ([`Buffer buf], last_operation)
+      | Some f ->
+          let buf = Buffer.new_result f in
+          let stack = [`Buffer buf; `Op op; `Buffer buf] in
+          let last_operation = last_operation stack in
+          let stack = simplify stack Op.max_precedence in
+          let result = eval stack in
+          let buf = Buffer.new_result result in
+          ([`Buffer buf], last_operation) )
+    | [] ->
+        ([], None)
 
 
   let repeat stack (operator, b) =
@@ -329,3 +382,69 @@ let input cal = function
       {cal with last_operation = None}
   | `Eq ->
       eq cal
+
+
+let string_to_buttons str =
+  str |> explode |> List.filter (fun c -> c <> ' ') |> List.map Button.of_char
+
+
+let eval str =
+  let button_list = string_to_buttons str in
+  let cal = make () in
+  let cal = List.fold_left input cal button_list in
+  cal.display
+
+
+let%test _ = eval "" = "0"
+
+let%test _ = eval "1" = "1"
+
+let%test _ = eval "12" = "12"
+
+let%test _ = eval "12+" = "12"
+
+let%test _ = eval "12+3" = "3"
+
+let%test _ = eval "12+3*" = "3"
+
+let%test _ = eval "12+3*5" = "5"
+
+let%test _ = eval "12+3*5/" = "15"
+
+let%test _ = eval "12+3*5/+" = "27"
+
+let%test _ = eval "12+3*5/+=" = "54"
+
+let%test _ = eval "=" = "0"
+
+let%test _ = eval "==" = "0"
+
+let%test _ = eval "==1" = "1"
+
+let%test _ = eval "==1==" = "1"
+
+let%test _ = eval "==1==+" = "1"
+
+let%test _ = eval "==1==+=" = "2"
+
+let%test _ = eval "==1==+==" = "3"
+
+let%test _ = eval "==1==+==6" = "6"
+
+let%test _ = eval "==1==+==6=" = "7"
+
+let%test _ = eval "1+2C3=" = "4"
+
+let%test _ = eval "1+2C3==" = "7"
+
+let%test _ = eval "1+2+C=" = "3"
+
+let%test _ = eval "1+2+C==" = "3"
+
+let%test _ = eval "1+2+C.2=" = "3.2"
+
+let%test _ = eval "1+2+C.2==" = "3.4"
+
+let%test _ = eval "1+2+C.2==~" = "-3.4"
+
+let%test _ = eval "1+2+C.2==~=" = "-3.2"
