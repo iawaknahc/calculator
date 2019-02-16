@@ -10,7 +10,7 @@ let make ?(max_input_number_of_digits = 9) () =
   ; ac = true
   ; display = "0"
   ; last_operation = None
-  ; stack = [] }
+  ; stack = Stack.empty }
 
 
 let reset cal =
@@ -19,83 +19,37 @@ let reset cal =
 
 
 let append_number cal n =
-  match cal.stack with
-  | `Buffer b :: rest ->
-      let max = cal.max_input_number_of_digits in
-      let b = Buffer.append_number b max n in
-      let stack = `Buffer b :: rest in
-      let display = Stack.top_display stack in
-      {cal with display; stack}
-  | rest ->
-      let stack = `Buffer (Buffer.new_number n) :: rest in
-      let display = Stack.top_display stack in
-      {cal with display; stack}
+  let max = cal.max_input_number_of_digits in
+  let stack = Stack.append_number cal.stack ~max ~n in
+  let display = Stack.top_display stack in
+  {cal with display; stack}
 
 
 let append_dot cal =
-  match cal.stack with
-  | `Buffer b :: rest ->
-      let stack = `Buffer (Buffer.append_dot b) :: rest in
-      let display = Stack.top_display stack in
-      {cal with display; stack}
-  | rest ->
-      let stack = `Buffer Buffer.new_dot :: rest in
-      let display = Stack.top_display stack in
-      {cal with display; stack}
+  let stack = Stack.append_dot cal.stack in
+  let display = Stack.top_display stack in
+  {cal with display; stack}
 
 
 let append_op cal op =
-  match cal.stack with
-  | `Op _ :: rest ->
-      let stack = `Op op :: rest in
-      let display =
-        match Stack.preview stack with
-        | None ->
-            Stack.top_display stack
-        | Some f ->
-            Misc.format_float f
-      in
-      {cal with display; stack}
-  | rest ->
-      let stack = Stack.simplify rest (Op.precedence op) in
-      let stack = `Op op :: stack in
-      let display =
-        match Stack.preview stack with
-        | None ->
-            Stack.top_display stack
-        | Some f ->
-            Misc.format_float f
-      in
-      {cal with display; stack}
+  let stack = Stack.append_op cal.stack op in
+  let display = Stack.top_display stack in
+  {cal with display; stack}
 
 
 let negate cal =
-  match cal.stack with
-  | `Buffer b :: rest ->
-      let stack = `Buffer (Buffer.toggle_sign b) :: rest in
-      let display = Stack.top_display stack in
-      {cal with display; stack}
-  | rest ->
-      let stack = `Buffer Buffer.new_sign :: rest in
-      let display = Stack.top_display stack in
-      {cal with display; stack}
+  let stack = Stack.negate cal.stack in
+  let display = Stack.top_display stack in
+  {cal with display; stack}
 
 
 let cancel cal =
   if cal.ac
   then reset cal
   else
-    match cal.stack with
-    | `Op _ :: _ as stack ->
-        let stack = `Buffer (Buffer.new_number 0) :: stack in
-        let display = Stack.top_display stack in
-        {cal with display; stack}
-    | `Buffer _ :: rest ->
-        let stack = `Buffer (Buffer.new_number 0) :: rest in
-        let display = Stack.top_display stack in
-        {cal with display; stack}
-    | _ ->
-        cal
+    let stack = Stack.cancel cal.stack in
+    let display = Stack.top_display stack in
+    {cal with display; stack}
 
 
 let eq cal =

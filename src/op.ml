@@ -4,9 +4,9 @@ type t =
   | `Sub
   | `Add ]
 
-let max_precedence = 10
-
 let precedence = function `Div | `Mul -> 10 | `Sub | `Add -> 9
+
+let ( >= ) op1 op2 = precedence op1 >= precedence op2
 
 let apply op a b =
   match op with

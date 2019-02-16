@@ -2,64 +2,110 @@ type item =
   [ `Buffer of Buffer.t
   | `Op of Op.t ]
 
+(*
+ * The length of the list must be 0, 1, 2, 3, 4 or 5.
+ * When the length is 6, we can always simplify to make it become 4.
+ * When the length is 5, we may simplify to make it become 3.
+ *)
 type t = item list
 
-let rec top_display = function
+let empty = []
+
+let simplify = function
+  | [`Buffer c; `Op op2; `Buffer b; `Op op1; `Buffer a] as stack ->
+      if Op.(op1 >= op2)
+      then
+        let a = Buffer.to_float a in
+        let b = Buffer.to_float b in
+        let d = Op.apply op1 a b in
+        [`Buffer c; `Op op2; `Buffer (Buffer.new_result d)]
+      else stack
+  | [`Op op3; `Buffer c; `Op op2; `Buffer b; `Op op1; `Buffer a] ->
+      let b = Buffer.to_float b in
+      let c = Buffer.to_float c in
+      let d = Op.apply op2 b c in
+      [`Op op3; `Buffer (Buffer.new_result d); `Op op1; `Buffer a]
+  | stack ->
+      stack
+
+
+let append_number stack ~max ~n =
+  match stack with
+  | `Buffer b :: rest ->
+      `Buffer (Buffer.append_number b max n) :: rest
+  | rest ->
+      `Buffer (Buffer.new_number n) :: rest |> simplify
+
+
+let append_dot = function
+  | `Buffer b :: rest ->
+      `Buffer (Buffer.append_dot b) :: rest
+  | rest ->
+      `Buffer Buffer.new_dot :: rest |> simplify
+
+
+let append_op stack op =
+  match stack with
+  | [] ->
+      [`Op op; `Buffer (Buffer.new_number 0)]
+  | `Op _ :: rest ->
+      `Op op :: rest
+  | rest ->
+      `Op op :: rest |> simplify
+
+
+let negate = function
+  | `Buffer b :: rest ->
+      `Buffer (Buffer.toggle_sign b) :: rest
+  | rest ->
+      `Buffer Buffer.new_sign :: rest |> simplify
+
+
+let cancel = function
+  | `Op _ :: _ as rest ->
+      `Buffer (Buffer.new_number 0) :: rest |> simplify
+  | `Buffer _ :: rest ->
+      `Buffer (Buffer.new_number 0) :: rest
+  | rest ->
+      rest
+
+
+let top_display = function
   | [] ->
       "0"
   | `Buffer b :: _ ->
       Buffer.format b
-  | _ :: rest ->
-      top_display rest
-
-
-let rec eval = function
-  | [] ->
-      0.0
-  | [`Buffer b] ->
-      Buffer.to_float b
-  | `Op _ :: rest ->
-      eval rest
-  | `Buffer b :: `Op op :: rest ->
-      let b = Buffer.to_float b in
-      let f = Op.apply op in
-      f (eval rest) b
+  | [`Op op2; `Buffer b; `Op op1; `Buffer a] ->
+      if Op.(op1 >= op2)
+      then
+        let a = Buffer.to_float a in
+        let b = Buffer.to_float b in
+        Misc.format_float (Op.apply op1 a b)
+      else Buffer.format b
+  | [`Op _; `Buffer a] ->
+      Buffer.format a
   | _ ->
       failwith "unreachable"
 
 
-let preview stack =
-  let ops = List.filter_map (function `Op op -> Some op | _ -> None) stack in
-  let possible =
-    match ops with
-    | [] ->
-        false
-    | op :: _ ->
-        let p = Op.precedence op in
-        List.for_all (fun op -> p = Op.precedence op) ops
-  in
-  if not possible then None else Some (eval stack)
-
-
-let simplify stack precedence =
-  match stack with
-  | `Buffer b :: `Op op :: `Buffer a :: rest ->
-      let pred = Op.precedence op in
-      if pred >= precedence && precedence = Op.max_precedence
-      then
-        let c = Op.apply op (Buffer.to_float a) (Buffer.to_float b) in
-        let buf = Buffer.new_result c in
-        `Buffer buf :: rest
-      else stack
+let eval = function
+  | [] ->
+      0.0
+  | [`Buffer b] ->
+      Buffer.to_float b
+  | [`Buffer c; `Op op2; `Buffer b; `Op op1; `Buffer a] ->
+      let a = Buffer.to_float a in
+      let b = Buffer.to_float b in
+      let c = Buffer.to_float c in
+      if Op.(op1 >= op2)
+      then Op.apply op2 (Op.apply op1 a b) c
+      else Op.apply op1 a (Op.apply op2 b c)
+  | [`Buffer b; `Op op; `Buffer a] ->
+      let a = Buffer.to_float a in
+      let b = Buffer.to_float b in
+      Op.apply op a b
   | _ ->
-      stack
-
-
-let add_missing_operand = function
-  | `Op op :: `Buffer b :: rest ->
-      `Buffer b :: `Op op :: `Buffer b :: rest
-  | stack ->
-      stack
+      failwith "unreachable"
 
 
 let last_operation = function
@@ -69,38 +115,21 @@ let last_operation = function
       None
 
 
-let eq stack =
-  (*
-     * The behavior of eq depends on the top of stack is operator or not.
-     * If it is an operand, just eval.
-     * If it is an operator, try preview-eval.
-     *   If success, the stack becomes [result; operator; result] and eval this stack.
-     *   Otherwise, add missing operand and eval the stack.
-     * *)
-  match stack with
-  | `Buffer _ :: _ ->
+let eq = function
+  | `Buffer _ :: _ as stack ->
       let last_operation = last_operation stack in
-      let stack = simplify stack Op.max_precedence in
       let result = eval stack in
       let buf = Buffer.new_result result in
       ([`Buffer buf], last_operation)
-  | `Op op :: _ ->
-    ( match preview stack with
-    | None ->
-        let stack = add_missing_operand stack in
-        let last_operation = last_operation stack in
-        let stack = simplify stack Op.max_precedence in
-        let result = eval stack in
-        let buf = Buffer.new_result result in
-        ([`Buffer buf], last_operation)
-    | Some f ->
-        let buf = Buffer.new_result f in
-        let stack = [`Buffer buf; `Op op; `Buffer buf] in
-        let last_operation = last_operation stack in
-        let stack = simplify stack Op.max_precedence in
-        let result = eval stack in
-        let buf = Buffer.new_result result in
-        ([`Buffer buf], last_operation) )
+  | `Op _ :: _ as stack ->
+      let operand =
+        top_display stack |> float_of_string |> Buffer.new_result
+      in
+      let stack = `Buffer operand :: stack in
+      let last_operation = last_operation stack in
+      let result = eval stack in
+      let buf = Buffer.new_result result in
+      ([`Buffer buf], last_operation)
   | [] ->
       ([], None)
 
