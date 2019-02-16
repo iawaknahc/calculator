@@ -122,14 +122,17 @@ let eq = function
       let buf = Buffer.new_result result in
       ([`Buffer buf], last_operation)
   | `Op _ :: _ as stack ->
-      let operand =
-        top_display stack |> float_of_string |> Buffer.new_result
-      in
-      let stack = `Buffer operand :: stack in
-      let last_operation = last_operation stack in
-      let result = eval stack in
-      let buf = Buffer.new_result result in
-      ([`Buffer buf], last_operation)
+    ( try
+        let operand =
+          top_display stack |> float_of_string |> Buffer.new_result
+        in
+        let stack = `Buffer operand :: stack in
+        let last_operation = last_operation stack in
+        let result = eval stack in
+        let buf = Buffer.new_result result in
+        ([`Buffer buf], last_operation)
+        (* float_of_string may fail due to "Error" *)
+      with Failure _ -> ([`Buffer (Buffer.new_result nan)], None) )
   | [] ->
       ([], None)
 

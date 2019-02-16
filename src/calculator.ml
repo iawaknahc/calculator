@@ -150,3 +150,17 @@ let%test _ = eval "1+2+C.2==" = "3.4"
 let%test _ = eval "1+2+C.2==~" = "-3.4"
 
 let%test _ = eval "1+2+C.2==~=" = "-3.2"
+
+let%test _ = eval "1/0" = "0"
+
+let%test _ = eval "1/0+" = "Error"
+
+let%test _ = eval "1/0+*" = "Error"
+
+let%test _ = eval "1/0+*=" = "Error"
+
+let%test _ = eval "1/0+*=C" = "0"
+
+let%test _ = eval "1/0+*=C12" = "12"
+
+let%test _ = eval "1/0+*=C12+3=" = "15"
