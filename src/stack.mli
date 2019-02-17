@@ -17,3 +17,5 @@ val cancel : t -> t
 val eq : t -> t * (Op.t * float) option
 
 val repeat : t -> Op.t * float -> t
+
+val percent : t -> t

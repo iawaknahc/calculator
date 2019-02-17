@@ -1,4 +1,3 @@
-(* TODO: Implement percent *)
 type t =
   [ `Cancel
   | `Negate
@@ -7,6 +6,7 @@ type t =
   | `Sub
   | `Add
   | `Eq
+  | `Percent
   | `Dot
   | `Num of int ]
 
@@ -25,6 +25,8 @@ let of_char = function
       `Add
   | '=' ->
       `Eq
+  | '%' ->
+      `Percent
   | '.' ->
       `Dot
   | '0' .. '9' as ch ->

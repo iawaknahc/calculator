@@ -146,3 +146,82 @@ let repeat stack (operator, b) =
       `Buffer buf :: rest
   | _ ->
       stack
+
+
+let percent = function
+  | [] ->
+      []
+  (* a % => a/100 *)
+  | [`Buffer a] ->
+      let a = Buffer.to_float a in
+      let result = Op.apply `Div a 100.0 in
+      let buf = Buffer.new_result result in
+      [`Buffer buf]
+  (* a + % => a + ((a * a) / 100) *)
+  (* a - % => a - ((a * a) / 100) *)
+  | [`Op (`Add as op); `Buffer a] | [`Op (`Sub as op); `Buffer a] ->
+      let af = Buffer.to_float a in
+      let b = Op.apply `Div (Op.apply `Mul af af) 100.0 in
+      [`Buffer (Buffer.new_result b); `Op op; `Buffer a]
+  (* a * % => a * (a / 100) *)
+  (* a / % => a / (a / 100) *)
+  | [`Op (`Mul as op); `Buffer a] | [`Op (`Div as op); `Buffer a] ->
+      let af = Buffer.to_float a in
+      let b = Op.apply `Div af 100.0 in
+      [`Buffer (Buffer.new_result b); `Op op; `Buffer a]
+  (* a + b % => a + (a * b / 100) *)
+  (* a - b % => a - (a * b / 100) *)
+  | [`Buffer b; `Op (`Add as op); `Buffer a]
+  | [`Buffer b; `Op (`Sub as op); `Buffer a] ->
+      let bf = Buffer.to_float b in
+      let af = Buffer.to_float a in
+      let c = Op.apply `Div (Op.apply `Mul af bf) 100.0 in
+      [`Buffer (Buffer.new_result c); `Op op; `Buffer a]
+  (* a * b % => a * (b / 100) *)
+  (* a / b % => a / (b / 100) *)
+  | [`Buffer b; `Op (`Mul as op); `Buffer a]
+  | [`Buffer b; `Op (`Div as op); `Buffer a] ->
+      let bf = Buffer.to_float b in
+      let c = Op.apply `Div bf 100.0 in
+      [`Buffer (Buffer.new_result c); `Op op; `Buffer a]
+  (* a * b + % => a * b + (a * (b * b) / 100) *)
+  (* a * b - % => a * b - (a * (b * b) / 100) *)
+  | [`Op (`Add as op); `Buffer b; `Op `Mul; `Buffer a]
+  | [`Op (`Sub as op); `Buffer b; `Op `Mul; `Buffer a] ->
+      let bf = Buffer.to_float b in
+      let af = Buffer.to_float a in
+      let c = Op.apply `Mul af (Op.apply `Div (Op.apply `Mul bf bf) 100.0) in
+      [`Buffer (Buffer.new_result c); `Op op; `Buffer b; `Op `Mul; `Buffer a]
+  (* a / b + % => a / b + (a / 100) *)
+  (* a / b - % => a / b - (a / 100) *)
+  | [`Op (`Add as op); `Buffer b; `Op `Div; `Buffer a]
+  | [`Op (`Sub as op); `Buffer b; `Op `Div; `Buffer a] ->
+      let af = Buffer.to_float a in
+      let c = Op.apply `Div af 100.0 in
+      [`Buffer (Buffer.new_result c); `Op op; `Buffer b; `Op `Div; `Buffer a]
+  (* a + b - % => a + b - (((a + b) * b) / 100) *)
+  (* a - b + % => a - b + (((a - b) * b) / 100) *)
+  | [`Op (`Add as op2); `Buffer b; `Op op1; `Buffer a]
+  | [`Op (`Sub as op2); `Buffer b; `Op op1; `Buffer a] ->
+      let bf = Buffer.to_float b in
+      let af = Buffer.to_float a in
+      let c = Op.apply `Div (Op.apply `Mul (Op.apply op1 af bf) bf) 100.0 in
+      [`Buffer (Buffer.new_result c); `Op op2; `Buffer b; `Op op1; `Buffer a]
+  (* a op b + c % => a op b + ((a op b) * c / 100) *)
+  (* a op b - c % => a op b - ((a op b) * c / 100) *)
+  | [`Buffer c; `Op (`Add as op2); `Buffer b; `Op op1; `Buffer a]
+  | [`Buffer c; `Op (`Sub as op2); `Buffer b; `Op op1; `Buffer a] ->
+      let cf = Buffer.to_float c in
+      let bf = Buffer.to_float b in
+      let af = Buffer.to_float a in
+      let d = Op.apply `Div (Op.apply `Mul (Op.apply op1 af bf) cf) 100.0 in
+      [`Buffer (Buffer.new_result d); `Op op2; `Buffer b; `Op op1; `Buffer a]
+  (* a op b * c % => a op b + (c / 100) *)
+  (* a op b / c % => a op b - (c / 100) *)
+  | [`Buffer c; `Op (`Mul as op2); `Buffer b; `Op op1; `Buffer a]
+  | [`Buffer c; `Op (`Div as op2); `Buffer b; `Op op1; `Buffer a] ->
+      let cf = Buffer.to_float c in
+      let d = Op.apply `Div cf 100.0 in
+      [`Buffer (Buffer.new_result d); `Op op2; `Buffer b; `Op op1; `Buffer a]
+  | _ ->
+      failwith "unreachable"
