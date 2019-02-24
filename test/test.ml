@@ -1,4 +1,13 @@
-let eval = Calculator.eval
+let string_of_char ch = String.make 1 ch
+
+let split s = s |> String.to_seq |> Seq.map string_of_char |> List.of_seq
+
+let eval str =
+  let cal = Calculator.make () in
+  let buttons = split str in
+  let cal = List.fold_left Calculator.button cal buttons in
+  Calculator.display cal
+
 
 let%test _ = eval "" = "0"
 

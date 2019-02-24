@@ -5,18 +5,15 @@ type t =
   ; last_operation : (Op.t * float) option
   ; stack : Stack.t }
 
-let make ?(max_input_number_of_digits = 9) () =
-  { max_input_number_of_digits
+let make () =
+  { max_input_number_of_digits = 9
   ; ac = true
   ; display = "0"
   ; last_operation = None
   ; stack = Stack.empty }
 
 
-let reset cal =
-  let max_input_number_of_digits = cal.max_input_number_of_digits in
-  make ~max_input_number_of_digits ()
-
+let reset _cal = make ()
 
 let append_number cal n =
   let max = cal.max_input_number_of_digits in
@@ -91,15 +88,6 @@ let input cal = function
       percent cal
 
 
-let string_to_buttons str =
-  str
-  |> String.to_char_list
-  |> List.filter (fun c -> c <> ' ')
-  |> List.map Button.of_char
+let button cal str = Button.of_string str |> input cal
 
-
-let eval str =
-  let button_list = string_to_buttons str in
-  let cal = make () in
-  let cal = List.fold_left input cal button_list in
-  cal.display
+let display cal = cal.display
