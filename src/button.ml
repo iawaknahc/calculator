@@ -1,53 +1,45 @@
-type t =
-  [ `Cancel
-  | `Negate
-  | `Div
-  | `Mul
-  | `Sub
-  | `Add
-  | `Eq
-  | `Percent
-  | `Dot
-  | `Num of int ]
+open Types
+
+type t = button
 
 let of_string = function
   | "c" | "C" ->
-      `Cancel
+      Button_Cancel
   | "~" ->
-      `Negate
+      Button_Negate
   | "/" ->
-      `Div
+      Button_Div
   | "*" ->
-      `Mul
+      Button_Mul
   | "-" ->
-      `Sub
+      Button_Sub
   | "+" ->
-      `Add
+      Button_Add
   | "=" ->
-      `Eq
+      Button_Eq
   | "%" ->
-      `Percent
+      Button_Percent
   | "." ->
-      `Dot
+      Button_Dot
   | "0" ->
-      `Num 0
+      Button_Num 0
   | "1" ->
-      `Num 1
+      Button_Num 1
   | "2" ->
-      `Num 2
+      Button_Num 2
   | "3" ->
-      `Num 3
+      Button_Num 3
   | "4" ->
-      `Num 4
+      Button_Num 4
   | "5" ->
-      `Num 5
+      Button_Num 5
   | "6" ->
-      `Num 6
+      Button_Num 6
   | "7" ->
-      `Num 7
+      Button_Num 7
   | "8" ->
-      `Num 8
+      Button_Num 8
   | "9" ->
-      `Num 9
+      Button_Num 9
   | _ ->
       failwith "invalid char"
