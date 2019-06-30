@@ -1,8 +1,4 @@
-type op =
-  | Op_Div
-  | Op_Mul
-  | Op_Sub
-  | Op_Add
+type op = Op_Div | Op_Mul | Op_Sub | Op_Add
 
 type button =
   | Button_Cancel

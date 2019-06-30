@@ -8,7 +8,6 @@ let eval str =
   let cal = List.fold_left Calculator.button cal buttons in
   Calculator.display cal
 
-
 let%test _ = eval "" = "0"
 
 let%test _ = eval "1" = "1"
